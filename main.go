@@ -18,7 +18,7 @@ import (
 )
 
 
-const DAILY_BUDGET = 50.0 
+const DAILY_BUDGET =  2200
 
 
 var db *sql.DB
@@ -72,7 +72,7 @@ func main() {
 
 
 	b.Handle("/start", func(c tele.Context) error {
-		return c.Send(fmt.Sprintf("🤖 AI Finance Bot ready!\n\nYour daily budget is set to $%.2f.\nSend me an expense like '15 lunch' or use /daily to calculate savings.", DAILY_BUDGET))
+		return c.Send(fmt.Sprintf("🤖 AI Finance Bot ready!\n\nYour daily budget is set to ₦%.2f.\nSend me an expense like '15 lunch' or use /daily to calculate savings.", DAILY_BUDGET))
 	})
 
 
@@ -91,9 +91,9 @@ func main() {
 			if err != nil {
 				return c.Send("❌ Database error saving funds.")
 			}
-			return c.Send(fmt.Sprintf("🎉 **Day Complete!**\nSpent: $%.2f\nSaved: $%.2f\n\nI've moved the $%.2f to your savings ledger!", totalSpent, savings, savings))
+			return c.Send(fmt.Sprintf("🎉 **Day Complete!**\nSpent: ₦%.2f\nSaved: ₦%.2f\n\nI've moved the ₦%.2f to your savings ledger!", totalSpent, savings, savings))
 		} else {
-			return c.Send(fmt.Sprintf("📉 **Day Complete!**\nYou spent $%.2f, which is over your $%.2f budget. No savings today, but tomorrow is a new day!", totalSpent, DAILY_BUDGET))
+			return c.Send(fmt.Sprintf("📉 **Day Complete!**\nYou spent ₦%.2f, which is over your ₦%.2f budget. No savings today, but tomorrow is a new day!", totalSpent, DAILY_BUDGET))
 		}
 	})
 
@@ -118,7 +118,7 @@ func main() {
 		}
 
 		// 3. Reply to user
-		return c.Send(fmt.Sprintf("✅ Logged: $%.2f for %s\n(%s)", data.Amount, data.Category, data.Description))
+		return c.Send(fmt.Sprintf("✅ Logged: ₦%.2f for %s\n(%s)", data.Amount, data.Category, data.Description))
 	})
 
 	fmt.Println("🚀 Go Finance Bot is running...")
@@ -129,7 +129,7 @@ func main() {
 func parseExpenseWithAI(message string) (ExpenseData, error) {
 	// Construct the payload for Groq API
 	payload := map[string]interface{}{
-		"model": "llama-3.3-70b-versatile",
+		"model": "qwen/qwen3.8-27b",
 		"messages": []map[string]string{
 			{
 				"role":    "user",
