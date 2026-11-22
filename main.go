@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,6 +47,13 @@ func main() {
 		log.Fatal("Database Error:", err)
 	}
 
+	db.Exec(`CREATE TABLE IF NOT EXISTS earnings (
+		id INTEGER PRIMARY KEY AUTOINCREMENT, 
+		amount REAL,
+		period Text, 
+		date TEXT
+	)`)
+
 	db.Exec(`CREATE TABLE IF NOT EXISTS expenses (
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
 		amount REAL, 
@@ -71,9 +79,56 @@ func main() {
 
 
 
-	b.Handle("/start", func(c tele.Context) error {
-		return c.Send(fmt.Sprintf("🤖 AI Finance Bot ready!\n\nYour daily budget is set to ₦%.2f.\nSend me an expense like '15 lunch' or use /daily to calculate savings.", DAILY_BUDGET))
-	})
+
+		b.Handle("/start", func(c tele.Context) error {
+			var incomeAmount float64
+			var incomePeriod string
+			
+
+			err := db.QueryRow("SELECT amount, period FROM earnings ORDER BY id DESC LIMIT 1").Scan(&incomeAmount, &incomePeriod)
+			
+			if err != nil || incomeAmount == 0 {
+
+				return c.Send("🤖 **Welcome to your AI Finance Bot!**\n\nTo get started, please set your income and how often you receive it.\n\n👉 Example: `/setincome 100000 monthly` or `/setincome 25000 weekly`\n\nOnce set, you can start logging expenses like '1500 lunch'.")
+			}
+			
+
+			msg := fmt.Sprintf("🤖 **Welcome back!**\n\n💰 Income: ₦%.2f (%s)\n📉 Daily Budget: ₦%.2f\n\nSend me an expense like '1500 lunch' or use /daily to calculate savings.", incomeAmount, incomePeriod, DAILY_BUDGET)
+			return c.Send(msg)
+		})
+	
+		b.Handle("/setincome", func(c tele.Context) error {
+			args := c.Args() 
+			
+			if len(args) < 2 {
+				return c.Send("❌ Please provide both amount and period.\n👉 Example: `/setincome 100000 monthly`")
+			}
+			
+			period := strings.ToLower(args[1])
+			amount, err := strconv.ParseFloat(args[0], 64)
+			if err !=nil {
+				return c.Send("❌ Please provide a valid number for the amout")
+			}
+			validPeriods := []string{"daily",  "weekly", "monthly", "yearly"}
+			isValid := false
+			for _, p := range validPeriods {
+				if period == p {
+					isValid = true
+					break
+				}
+			}
+			
+			if !isValid {
+				return c.Send("❌ Invalid period. Please use: daily, weekly, monthly, or yearly.")
+			}
+			
+			_, err = db.Exec("INSERT INTO earnings (amount, period, date) VALUES (?, ?, datetime('now'))", amount, period)
+			if err != nil {
+				return c.Send("❌ Database error saving income.")
+			}
+			
+			return c.Send(fmt.Sprintf("✅ Income successfully set to ₦%.2f %s!\n\nYou can now start logging expenses.", amount, period))
+		})
 
 
 	b.Handle("/daily", func(c tele.Context) error {
