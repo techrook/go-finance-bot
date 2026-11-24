@@ -19,9 +19,6 @@ import (
 )
 
 
-const DAILY_BUDGET =  2200
-
-
 var db *sql.DB
 var groqKey string
 
@@ -67,6 +64,12 @@ func main() {
 		date TEXT
 	)`)
 
+		db.Exec(`CREATE TABLE IF NOT EXISTS bot_state (
+			key TEXT PRIMARY KEY,
+			value TEXT,
+			updated_at TEXT
+		)`)
+
 
 	pref := tele.Settings{
 		Token:  token,
@@ -93,7 +96,7 @@ func main() {
 			}
 			
 
-			msg := fmt.Sprintf("🤖 **Welcome back!**\n\n💰 Income: ₦%.2f (%s)\n📉 Daily Budget: ₦%.2f\n\nSend me an expense like '1500 lunch' or use /daily to calculate savings.", incomeAmount, incomePeriod, DAILY_BUDGET)
+			msg := fmt.Sprintf("🤖 **Welcome back!**\n\n💰 Income: ₦%.2f (%s)\n📉 Send me an expense like '1500 lunch' or use /daily to calculate savings.", incomeAmount, incomePeriod)
 			return c.Send(msg)
 		})
 	
@@ -131,26 +134,7 @@ func main() {
 		})
 
 
-	b.Handle("/daily", func(c tele.Context) error {
-		var totalSpent float64
-
-		err := db.QueryRow("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date(date) = date('now')").Scan(&totalSpent)
-		if err != nil {
-			return c.Send("❌ Database error calculating daily total.")
-		}
-
-		savings := DAILY_BUDGET - totalSpent
-		if savings > 0 {
-
-			_, err = db.Exec("INSERT INTO savings (amount, date) VALUES (?, datetime('now'))", savings)
-			if err != nil {
-				return c.Send("❌ Database error saving funds.")
-			}
-			return c.Send(fmt.Sprintf("🎉 **Day Complete!**\nSpent: ₦%.2f\nSaved: ₦%.2f\n\nI've moved the ₦%.2f to your savings ledger!", totalSpent, savings, savings))
-		} else {
-			return c.Send(fmt.Sprintf("📉 **Day Complete!**\nYou spent ₦%.2f, which is over your ₦%.2f budget. No savings today, but tomorrow is a new day!", totalSpent, DAILY_BUDGET))
-		}
-	})
+	
 
 
 	b.Handle(tele.OnText, func(c tele.Context) error {
@@ -159,7 +143,7 @@ func main() {
 			return nil
 		}
 
-		// 1. Send message to AI
+
 		data, err := parseExpenseWithAI(msg)
 		if err != nil {
 			return c.Send("❌ Couldn't parse that. Please format like: '20 groceries' or '15 lunch'.")
@@ -180,9 +164,9 @@ func main() {
 	b.Start()
 }
 
-// --- AI INTEGRATION ---
+
 func parseExpenseWithAI(message string) (ExpenseData, error) {
-	// Construct the payload for Groq API
+
 	payload := map[string]interface{}{
 		"model": "qwen/qwen3.8-27b",
 		"messages": []map[string]string{
@@ -210,7 +194,7 @@ func parseExpenseWithAI(message string) (ExpenseData, error) {
 
 	body, _ := io.ReadAll(resp.Body)
 
-	// Parse Groq API response structure
+
 	var groqResp struct {
 		Choices []struct {
 			Message struct {
@@ -222,12 +206,12 @@ func parseExpenseWithAI(message string) (ExpenseData, error) {
 		return ExpenseData{}, err
 	}
 
-	// Clean up the AI's JSON (remove markdown blocks if it adds them)
+
 	cleanJson := strings.ReplaceAll(groqResp.Choices[0].Message.Content, "```json", "")
 	cleanJson = strings.ReplaceAll(cleanJson, "```", "")
 	cleanJson = strings.TrimSpace(cleanJson)
 
-	// Unmarshal into our Go Struct
+
 	var data ExpenseData
 	err = json.Unmarshal([]byte(cleanJson), &data)
 	return data, err
